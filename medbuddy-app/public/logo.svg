@@ -1,0 +1,27 @@
+<svg
+  width="36"
+  height="36"
+  viewBox="0 0 200 100"
+  xmlns="http://www.w3.org/2000/svg"
+  class="logo-img"
+>
+  <defs>
+    <linearGradient id="pillGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#003366" />
+      <stop offset="50%" stop-color="#003366" />
+      <stop offset="50%" stop-color="#ffffff" />
+      <stop offset="100%" stop-color="#ffffff" />
+    </linearGradient>
+  </defs>
+  <rect
+    x="25"
+    y="25"
+    width="150"
+    height="50"
+    rx="25"
+    ry="25"
+    fill="url(#pillGradient)"
+    stroke="#003366"
+    stroke-width="4"
+  />
+</svg>
