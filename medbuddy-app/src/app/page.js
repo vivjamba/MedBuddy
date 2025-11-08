@@ -54,7 +54,7 @@ export default function Home() {
             </Link>
           </div>
           <nav className="nav">
-            <Link href="/about" className="nav-link">About</Link>
+            <Link href="/" className="nav-link">About</Link>
             <Link href="/medications" className="nav-link">Medications</Link>
           </nav>
           <div
@@ -75,7 +75,7 @@ export default function Home() {
           </p>
           <div className="buttons">
             <Link href="/medications" className="btn btn-blue">View Medications</Link>
-            <Link href="/about" className="btn btn-dark">Learn More</Link>
+            <Link href="/" className="btn btn-dark">Learn More</Link>
           </div>
         </div>
       </main>

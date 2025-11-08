@@ -5,7 +5,7 @@ export const authorizeFHIR = async () => {
     // This triggers the standalone OAuth2 login flow
     await FHIR.oauth2.authorize({
       clientId: process.env.FHIR_CLIENT_ID,
-      scope: 'patient/*.* openid profile',
+      scope: 'patient/*.* openid profile fhirUser',
       redirectUri: process.env.FHIR_REDIRECT_URI,
       iss: process.env.FHIR_ISSUER,
     });
