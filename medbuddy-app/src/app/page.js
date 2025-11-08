@@ -1,20 +1,47 @@
 "use client"
 
-import Image from 'next/image'
-import Link from 'next/link'
-import { useState } from 'react'
-import { connectToFHIR } from './fhirAuth'
+import Image from 'next/image';
+import Link from 'next/link';
+import { useState, useEffect } from 'react';
+import { authorizeFHIR, getClient } from './fhirAuth';
 
-const Home = () => {
-  const [user, setUser] = useState({ name: 'Log In' })
+export default function Home() {
+  const [user, setUser] = useState({ name: 'Log In' });
+
+  // Helper to format FHIR HumanName
+  const formatName = (nameArray) => {
+    if (!Array.isArray(nameArray) || nameArray.length === 0) return 'Patient';
+    const name = nameArray[0];
+    const prefix = name.prefix?.join(' ') || '';
+    const given = name.given?.join(' ') || '';
+    const family = name.family || '';
+    return [prefix, given, family].filter(Boolean).join(' ');
+  };
+
+  useEffect(() => {
+    // Check if user is already logged in on page load
+    (async () => {
+      const client = await getClient();
+      if (client) {
+        let patient;
+        if (client.patient && client.patient.id) {
+          // EHR/Sandbox launch
+          patient = await client.patient.read();
+        } else if (client.user?.fhirUser) {
+          // Standalone launch
+          patient = await client.request(client.user.fhirUser);
+        }
+
+        if (patient) {
+          setUser({ name: formatName(patient.name) });
+        }
+      }
+    })();
+  }, []);
 
   const handleLogin = async () => {
-    const client = await connectToFHIR()
-    if (client) {
-      const patient = await client.patient.read()
-      setUser({ name: patient.name ? patient.name[0].text : 'Patient' })
-    }
-  }
+    await authorizeFHIR(); // redirects to SMART login
+  };
 
   return (
     <div className="app">
@@ -22,7 +49,7 @@ const Home = () => {
         <div className="header-inner">
           <div className="logo-area">
             <Link href="/" className="logo-link" aria-label="MedBuddy">
-              <Image src="/logo.svg" alt="MedBuddy logo" width={36} height={36} className="logo-img" />
+              <Image src="/logo.svg" alt="MedBuddy logo" width={36} height={36} />
               <span className="logo-text">MedBuddy</span>
             </Link>
           </div>
@@ -30,7 +57,11 @@ const Home = () => {
             <Link href="/about" className="nav-link">About</Link>
             <Link href="/medications" className="nav-link">Medications</Link>
           </nav>
-          <div className="user" onClick={handleLogin} style={{ cursor: 'pointer' }}>
+          <div
+            className="user"
+            onClick={handleLogin}
+            style={{ cursor: 'pointer' }}
+          >
             {user.name}
           </div>
         </div>
@@ -59,7 +90,5 @@ const Home = () => {
         </div>
       </footer>
     </div>
-  )
+  );
 }
-
-export default Home
