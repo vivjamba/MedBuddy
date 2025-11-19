@@ -2,19 +2,17 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import Header from "../components/Header"
-import Footer from "../components/Footer"
-import { useMemo, useState } from "react";
+import Header from "../components/Header";
+import Footer from "../components/Footer";
+import { useMemo, useState, useEffect } from "react";
+import { getClient } from "../fhirAuth";
 import {
   CheckCircle2,
   AlertCircle,
   Clock,
   Pill,
-  Plus,
   Filter,
   SortAsc,
-  LogOut,
-  Settings,
   Search,
 } from "lucide-react";
 
@@ -23,19 +21,19 @@ function StatusBadge({ status }) {
     taken: {
       label: "Taken",
       className:
-        "bg-green-100 text-green-800 ring-1 ring-green-300 dark:bg-green-950/40 dark:text-green-300 dark:ring-green-800",
+        "bg-green-100 text-green-800 ring-1 ring-green-300",
       Icon: CheckCircle2,
     },
     missed: {
       label: "Missed",
       className:
-        "bg-red-100 text-red-800 ring-1 ring-red-300 dark:bg-red-950/40 dark:text-red-300 dark:ring-red-800",
+        "bg-red-100 text-red-800 ring-1 ring-red-300",
       Icon: AlertCircle,
     },
     upcoming: {
       label: "Upcoming",
       className:
-        "bg-blue-100 text-blue-800 ring-1 ring-blue-300 dark:bg-blue-950/40 dark:text-blue-300 dark:ring-blue-800",
+        "bg-blue-100 text-blue-800 ring-1 ring-blue-300",
       Icon: Clock,
     },
   };
@@ -58,15 +56,74 @@ function StatChip({ icon: Icon, label }) {
     </span>
   );
 }
-const MedicationsPage = () => {
 
-  const [medications, setMedications] = useState([
-    { id: "1", name: "Lisinopril", dosage: "10mg", instructions: "Take 1 tablet daily", timing: "Every morning at 8:00 AM", nextDose: "Tomorrow at 8:00 AM", status: "taken" },
-    { id: "2", name: "Metformin", dosage: "500mg", instructions: "Take 1 tablet twice daily", timing: "Morning at 8:00 AM and evening at 8:00 PM", nextDose: "Today at 8:00 PM", status: "upcoming" },
-    { id: "3", name: "Atorvastatin", dosage: "20mg", instructions: "Take 1 tablet daily", timing: "Every evening at 9:00 PM", nextDose: "Today at 9:00 PM", status: "upcoming" },
-    { id: "4", name: "Levothyroxine", dosage: "75mcg", instructions: "Take 1 tablet daily on empty stomach", timing: "Every morning at 7:00 AM", nextDose: "Today at 7:00 AM", status: "missed" },
-    { id: "5", name: "Omeprazole", dosage: "20mg", instructions: "Take 1 capsule daily", timing: "Every morning 30 minutes before breakfast", nextDose: "Tomorrow at 7:30 AM", status: "taken" },
-  ]);
+const MedicationsPage = () => {
+  const [medications, setMedications] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const client = await getClient();
+        if (!client) return;
+
+        let patient;
+        if (client.patient && client.patient.id) {
+          patient = await client.patient.read();
+        } else if (client.user?.fhirUser) {
+          patient = await client.request(client.user.fhirUser);
+        }
+
+        const bundle = await client.request(
+          `MedicationRequest?patient=${patient.id}`,
+          { flat: false }
+        );
+
+        if (!bundle?.entry?.length) {
+          setMedications([]);
+          return;
+        }
+
+        const parsed = bundle.entry.filter((entry) => entry.resource.status === "active").map((entry) => {
+          const med = entry.resource;
+          const medName =
+            med.medicationCodeableConcept?.text ||
+            med.medicationCodeableConcept?.coding?.[0]?.display ||
+            "Unknown Medication";
+
+          const dosage = med.dosageInstruction?.[0];
+          const dose =
+            dosage?.doseAndRate?.[0]?.doseQuantity?.value &&
+            dosage?.doseAndRate?.[0]?.doseQuantity?.unit
+              ? `${dosage.doseAndRate[0].doseQuantity.value} ${dosage.doseAndRate[0].doseQuantity.unit}`
+              : "";
+
+          const timing = dosage?.timing?.repeat;
+          const timeOfDay = timing?.timeOfDay?.join(", ");
+          const frequency =
+            timing?.frequency && timing?.period
+              ? `${timing.frequency}× every ${timing.period} ${timing.periodUnit}`
+              : "";
+
+          return {
+            id: med.id,
+            name: medName,
+            dosage: dose || "N/A",
+            instructions: dosage?.text || "No specific instructions.",
+            timing: timeOfDay || frequency || "No timing info",
+            nextDose: "N/A",
+            status: "upcoming",
+          };
+        });
+
+        setMedications(parsed);
+      } catch (err) {
+        console.error("Error fetching medications:", err);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
 
   const [sortBy, setSortBy] = useState("time");
   const [filterStatus, setFilterStatus] = useState("all");
@@ -74,7 +131,7 @@ const MedicationsPage = () => {
 
   const takenCount = useMemo(() => medications.filter((m) => m.status === "taken").length, [medications]);
   const missedCount = useMemo(() => medications.filter((m) => m.status === "missed").length, [medications]);
-  const upcomingCount = useMemo(() => medications.filter((m) => m.status === "upcoming").length, [medications]);
+  const upcomingCount = useMemo(() => medications.filter((m) => m.status === "upcoming" ).length, [medications]);
 
   const filteredSorted = useMemo(() => {
     let list = [...medications];
@@ -113,24 +170,35 @@ const MedicationsPage = () => {
     []
   );
 
+  if (loading)
+    return (
+      <div className="flex items-center justify-center h-screen text-[var(--foreground)]/70">
+        Loading medications...
+      </div>
+    );
+
+  if (medications.length === 0)
+    return (
+      <div className="flex items-center justify-center h-screen text-[var(--foreground)]/70">
+        No medications found
+      </div>
+    );
+
   return (
-    <div className="app">
+    <div className="app bg-[var(--background)] text-[var(--foreground)]">
       <Header></Header>
 
-      {/* Main content */}
       <main className="main">
         <div className="main-inner text-left">
-          <h1 className="title">My Medications</h1>
+          <h1 className="title text-[var(--foreground)]">My Medications</h1>
           <p className="subtitle text-[var(--foreground)]/70">{todayStr}</p>
 
-          {/* Stats */}
           <div className="stats flex gap-2 flex-wrap my-4">
             <StatChip icon={CheckCircle2} label={`${takenCount} Taken`} />
             <StatChip icon={AlertCircle} label={`${missedCount} Missed`} />
             <StatChip icon={Clock} label={`${upcomingCount} Upcoming`} />
           </div>
 
-          {/* Controls */}
           <div className="filters flex gap-2 flex-wrap mb-6">
             <div className="relative flex-1 min-w-[200px]">
               <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--foreground)]/50" />
@@ -145,22 +213,21 @@ const MedicationsPage = () => {
 
             <button
               onClick={() => setSortBy((s) => (s === "time" ? "name" : "time"))}
-              className="inline-flex items-center gap-2 rounded-lg border border-[var(--foreground)]/10 bg-[var(--background)] px-3 py-2 text-sm hover:bg-[var(--foreground)]/5"
+              className="inline-flex items-center gap-2 rounded-lg border border-[var(--foreground)]/10 bg-[var(--background)] px-3 py-2 text-sm hover:bg-[var(--foreground)]/5 text-[var(--foreground)]"
             >
-              <SortAsc className="h-4 w-4 text-[var(--foreground)]" /> Sort:{" "}
+              <SortAsc className="h-4 w-4" /> Sort:{" "}
               {sortBy === "time" ? "By Time" : "By Name"}
             </button>
 
             <button
               onClick={() => setFilterStatus((f) => (f === "all" ? "active" : "all"))}
-              className="inline-flex items-center gap-2 rounded-lg border border-[var(--foreground)]/10 bg-[var(--background)] px-3 py-2 text-sm hover:bg-[var(--foreground)]/5"
+              className="inline-flex items-center gap-2 rounded-lg border border-[var(--foreground)]/10 bg-[var(--background)] px-3 py-2 text-sm hover:bg-[var(--foreground)]/5 text-[var(--foreground)]"
             >
-              <Filter className="h-4 w-4 text-[var(--foreground)]" />{" "}
+              <Filter className="h-4 w-4" />{" "}
               {filterStatus === "all" ? "All Medications" : "Active Only"}
             </button>
           </div>
 
-          {/* Table */}
           <div className="medication-table overflow-x-auto border border-[var(--foreground)]/10 rounded-xl bg-[var(--background)]">
             <table className="w-full text-sm border-collapse">
               <thead className="bg-[var(--foreground)]/5">
@@ -181,7 +248,7 @@ const MedicationsPage = () => {
                   >
                     <td className="p-3">
                       <div className="flex items-center gap-3">
-                        <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-blue-50 ring-1 ring-inset ring-blue-200 dark:bg-blue-950/40 dark:ring-blue-900">
+                        <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-blue-50 ring-1 ring-inset ring-blue-200">
                           <Pill className="h-4 w-4 text-blue-600" />
                         </span>
                         <div>
@@ -219,10 +286,9 @@ const MedicationsPage = () => {
         </div>
       </main>
 
-     
-    <Footer></Footer>
-
+      <Footer></Footer>
     </div>
   );
-}
+};
+
 export default MedicationsPage;
