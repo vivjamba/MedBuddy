@@ -112,7 +112,7 @@ const MedicationsPage = () => {
             instructions: dosage?.text || "No specific instructions.",
             timing: timeOfDay || frequency || "No timing info",
             nextDose: "N/A",
-            status: "upcoming",
+            status: med.status === "active" ? "upcoming" : med.status
           };
         });
 
@@ -170,23 +170,9 @@ const MedicationsPage = () => {
     []
   );
 
-  if (loading)
-    return (
-      <div className="flex items-center justify-center h-screen text-[var(--foreground)]/70">
-        Loading medications...
-      </div>
-    );
-
-  if (medications.length === 0)
-    return (
-      <div className="flex items-center justify-center h-screen text-[var(--foreground)]/70">
-        No medications found
-      </div>
-    );
-
   return (
     <div className="app bg-[var(--background)] text-[var(--foreground)]">
-      <Header></Header>
+      <Header />
 
       <main className="main">
         <div className="main-inner text-left">
@@ -215,8 +201,7 @@ const MedicationsPage = () => {
               onClick={() => setSortBy((s) => (s === "time" ? "name" : "time"))}
               className="inline-flex items-center gap-2 rounded-lg border border-[var(--foreground)]/10 bg-[var(--background)] px-3 py-2 text-sm hover:bg-[var(--foreground)]/5 text-[var(--foreground)]"
             >
-              <SortAsc className="h-4 w-4" /> Sort:{" "}
-              {sortBy === "time" ? "By Time" : "By Name"}
+              <SortAsc className="h-4 w-4" /> Sort: {sortBy === "time" ? "By Time" : "By Name"}
             </button>
 
             <button
@@ -228,67 +213,74 @@ const MedicationsPage = () => {
             </button>
           </div>
 
-          <div className="medication-table overflow-x-auto border border-[var(--foreground)]/10 rounded-xl bg-[var(--background)]">
-            <table className="w-full text-sm border-collapse">
-              <thead className="bg-[var(--foreground)]/5">
-                <tr>
-                  <th className="text-left p-3 text-[var(--foreground)]">Medication</th>
-                  <th className="text-left p-3 text-[var(--foreground)]">Instructions</th>
-                  <th className="text-left p-3 text-[var(--foreground)]">Timing</th>
-                  <th className="text-left p-3 text-[var(--foreground)]">Next Dose</th>
-                  <th className="text-left p-3 text-[var(--foreground)]">Status</th>
-                  <th className="text-right p-3 text-[var(--foreground)]">Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredSorted.map((m) => (
-                  <tr
-                    key={m.id}
-                    className="border-t border-[var(--foreground)]/10 hover:bg-[var(--foreground)]/5"
-                  >
-                    <td className="p-3">
-                      <div className="flex items-center gap-3">
-                        <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-blue-50 ring-1 ring-inset ring-blue-200">
-                          <Pill className="h-4 w-4 text-blue-600" />
-                        </span>
-                        <div>
-                          <div className="font-medium text-[var(--foreground)]">
-                            {m.name}
-                          </div>
-                          <div className="text-[var(--foreground)]/70">{m.dosage}</div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="p-3 text-[var(--foreground)]/70">{m.instructions}</td>
-                    <td className="p-3 text-[var(--foreground)]/70">{m.timing}</td>
-                    <td className="p-3 text-[var(--foreground)]">{m.nextDose}</td>
-                    <td className="p-3">
-                      <StatusBadge status={m.status} />
-                    </td>
-                    <td className="p-3 text-right">
-                      <button
-                        onClick={() => logDose(m.id)}
-                        disabled={m.status === "taken"}
-                        className={`inline-flex items-center justify-center rounded-lg px-3 py-1.5 text-sm font-medium ring-1 ring-inset transition disabled:opacity-60 disabled:cursor-not-allowed ${
-                          m.status === "taken"
-                            ? "bg-transparent ring-[var(--foreground)]/10 hover:bg-[var(--foreground)]/10"
-                            : "bg-[var(--foreground)] text-[var(--background)] hover:opacity-90"
-                        }`}
-                      >
-                        {m.status === "taken" ? "Logged" : "Log dose"}
-                      </button>
-                    </td>
+          {loading ? (
+            <div className="flex items-center justify-center">
+              Loading medications...
+            </div>
+          ) : medications.length === 0 ? (
+            <div className="flex items-center justify-center">
+              No active medications found
+            </div>
+          ) : (
+            <div className="medication-table overflow-x-auto border border-[var(--foreground)]/10 rounded-xl bg-[var(--background)]">
+              <table className="w-full text-sm border-collapse">
+                <thead className="bg-[var(--foreground)]/5">
+                  <tr>
+                    <th className="text-left p-3 text-[var(--foreground)]">Medication</th>
+                    <th className="text-left p-3 text-[var(--foreground)]">Instructions</th>
+                    <th className="text-left p-3 text-[var(--foreground)]">Timing</th>
+                    <th className="text-left p-3 text-[var(--foreground)]">Next Dose</th>
+                    <th className="text-left p-3 text-[var(--foreground)]">Status</th>
+                    <th className="text-right p-3 text-[var(--foreground)]">Action</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {filteredSorted.map((m) => (
+                    <tr
+                      key={m.id}
+                      className="border-t border-[var(--foreground)]/10 hover:bg-[var(--foreground)]/5"
+                    >
+                      <td className="p-3">
+                        <div className="flex items-center gap-3">
+                          <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-blue-50 ring-1 ring-inset ring-blue-200">
+                            <Pill className="h-4 w-4 text-blue-600" />
+                          </span>
+                          <div>
+                            <div className="font-medium text-[var(--foreground)]">{m.name}</div>
+                            <div className="text-[var(--foreground)]/70">{m.dosage}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="p-3 text-[var(--foreground)]/70">{m.instructions}</td>
+                      <td className="p-3 text-[var(--foreground)]/70">{m.timing}</td>
+                      <td className="p-3 text-[var(--foreground)]">{m.nextDose}</td>
+                      <td className="p-3">
+                        <StatusBadge status={m.status} />
+                      </td>
+                      <td className="p-3 text-right">
+                        <button
+                          onClick={() => logDose(m.id)}
+                          disabled={m.status === "taken"}
+                          className={`inline-flex items-center justify-center rounded-lg px-3 py-1.5 text-sm font-medium ring-1 ring-inset transition disabled:opacity-60 disabled:cursor-not-allowed ${
+                            m.status === "taken"
+                              ? "bg-transparent ring-[var(--foreground)]/10 hover:bg-[var(--foreground)]/10"
+                              : "bg-[var(--foreground)] text-[var(--background)] hover:opacity-90"
+                          }`}
+                        >
+                          {m.status === "taken" ? "Logged" : "Log dose"}
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       </main>
 
-      <Footer></Footer>
+      <Footer />
     </div>
   );
-};
-
+}
 export default MedicationsPage;
